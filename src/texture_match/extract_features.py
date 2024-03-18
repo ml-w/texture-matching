@@ -137,10 +137,13 @@ def get_features_from_slice(im_slice: sitk.Image,
     """Get features from slice"""
 
     # Get patch stack
-    patch_stack = sample_patches(im_slice, seg_slice, patch_size)
+    patch_stack, patch_coords = sample_patches(im_slice, seg_slice, patch_size, return_coords=True)
     
     # Extract features
     feats = get_features_from_patch_stack(patch_stack, pyrad_setting=pyrad_setting)
+
+    # attach the corner indice of patches to features
+    feats['Patch Corner Coordinate'] = patch_coords
     
     return feats
 
@@ -220,8 +223,8 @@ def get_features_from_image(im: sitk.Image,
             _im_slice = im[:, :,idx]  
             _seg_slice = seg[:, :,idx] 
             
-            o = _extract_eatures(idx, _im_slice, _seg_slice, patch_size=patch_size, 
-                                include_vicinity=include_vicinity, pyrad_setting=pyrad_setting, **kwargs)
+            o = _extract_features(idx, _im_slice, _seg_slice, patch_size=patch_size,
+                                  include_vicinity=include_vicinity, pyrad_setting=pyrad_setting, **kwargs)
             if not o is None:    
                 rows.append(o)
     else:
@@ -230,7 +233,7 @@ def get_features_from_image(im: sitk.Image,
         
         idxs = range(z, z + d + 1)
         args = [idxs, [im[:, :, idx] for idx in idxs], [seg[:, :, idx] for idx in idxs]]
-        func = partial(_extract_eatures, patch_size = patch_size, include_vicinity = include_vicinity, pyrad_setting=pyrad_setting, **kwargs)
+        func = partial(_extract_features, patch_size = patch_size, include_vicinity = include_vicinity, pyrad_setting=pyrad_setting, **kwargs)
         
         p = pool.starmap_async(func, repeat_zip(*args))
         pool.close()
@@ -259,12 +262,12 @@ def get_features_from_image(im: sitk.Image,
     return out_df
             
 
-def _extract_eatures(i: int, 
-                     im_slice: sitk.Image,
-                     seg_slice: sitk.Image, 
-                     patch_size: int=None, 
-                     include_vicinity: bool=None, 
-                     pyrad_setting: Union[str, Path]=None, **kwargs):
+def _extract_features(i: int,
+                      im_slice: sitk.Image,
+                      seg_slice: sitk.Image,
+                      patch_size: int=None,
+                      include_vicinity: bool=None,
+                      pyrad_setting: Union[str, Path]=None, **kwargs):
     """This is a helper function that is intended for mpi"""
     logger = MNTSLogger['texture-match.extract_features']
     logger.info(f"Current thread: {mpi.current_process().name}")

@@ -59,7 +59,10 @@ def find_square_patches(binary_mask: sitk.Image, l: int) -> List[Tuple]:
     return valid_patches
 
 
-def sample_patches(sitkslice: sitk.Image, sitkmask: sitk.Image, l: int) -> sitk.Image:
+def sample_patches(sitkslice: sitk.Image,
+                   sitkmask: sitk.Image,
+                   l: int,
+                   return_coords: Optional[bool] = False) -> Union[sitk.Image, Tuple[sitk.Image, List[Tuple[int, int]]]]:
     """Extracts square patches from a 2D image slice based on a segmentation mask.
 
     This function computes a bounding box from the given segmentation mask and extracts patches
@@ -73,10 +76,15 @@ def sample_patches(sitkslice: sitk.Image, sitkmask: sitk.Image, l: int) -> sitk.
             The 2D segmentation mask that determines the region of interest in the image slice.
         l (int): 
             The side length in pixels of the square patches to be extracted.
+        return_coords (bool):
+            If specified, return also the patch coords.
 
     Returns:
-        sitk.Image: An image object containing the stacked extracted patches. The origin is set to
-        (0, 0, 0) and the spacing is set to (1, 1, 1).
+        sitk.Image:
+            An image object containing the stacked extracted patches. The origin is set to (0, 0, 0) and
+            the spacing is set to (1, 1, 1).
+        List[(int, int)]:
+            A list of tuple of two coordinates
 
     Note:
         - This function strips the spacing information off from the output image. The output
@@ -113,5 +121,8 @@ def sample_patches(sitkslice: sitk.Image, sitkmask: sitk.Image, l: int) -> sitk.
     
     # * Convert patch_stack to sitk image
     patch_stack = sitk.GetImageFromArray(patch_stack)
-    return patch_stack
+    if return_coords:
+        return patch_stack, [tuple(p) for p in patches]
+    else:
+        return patch_stack
 

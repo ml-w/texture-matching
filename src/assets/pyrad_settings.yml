@@ -5,9 +5,6 @@ imageType:
     lbp2DRadius: 1 # 1mm is fake unit, means 1 grid voxel here
     lbp2DMethod: 'default'
     force2D: True
-  LoG:
-    sigma: [1, 1, 1] # 1mm is fake unit, means 1 grid voxel here
-    force2D: True
   Gradient: {}
   Exponential: {}
 
@@ -26,7 +23,11 @@ featureClass:
     - Variance
   glcm:
   glrlm:
+  gldm:
 
 setting:
+  normalize: True
+  normalizeScale: 10
+  removeOutliers: 3 # Remove outliers 3 SDs from mean
   binCount: 16
-  preCrop: True
+  preCrop: False # No need to crop because all patches are already cropped
