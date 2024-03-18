@@ -58,8 +58,8 @@ class TestPatchPreprocessing(unittest.TestCase):
     
     def test_extract_features(self):
         """Test feature extraction"""
-        dummy_image = np.ones([10, 16, 16], dtype='uint32')
-        dummy_image = sitk.GetImageFromArray(dummy_image)
+        dummy_image = np.random.randn(10, 16, 16) * 32
+        dummy_image = sitk.GetImageFromArray(dummy_image.astype('uint32'))
         
         df = get_features_from_patch_stack(dummy_image, pyrad_setting=self.pyrad_setting_file)
         self.assertGreater(df.shape[0], 1)
