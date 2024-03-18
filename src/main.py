@@ -105,7 +105,15 @@ def main(input_dir: Path,
         
         # * get features
         try:
-            df = get_features_from_image(sitk_im, 
+            if not all([
+                np.isclose(sitk_im.GetSize(), sitk_seg.GetSize()),
+                np.isclose(sitk_im.GetSpacing(), sitk_seg.GetSpacing()),
+                np.isclose(sitk_im.GetOrigin(), sitk_seg.GetOrigin()),
+            ]):
+                #! This needs a unit test
+                main_logger.warning("Found discripency between image and segmentation pair, resampling segmentation.")
+                sitk_seg = sitk.Resample(sitk_seg, referenceImage=sitk_im)
+            df = get_features_from_image(sitk_im,
                                         sitk_seg, 
                                         patch_size, 
                                         pyrad_setting=pyrad_setting_file, 
