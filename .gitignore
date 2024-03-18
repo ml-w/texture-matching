@@ -1,0 +1,6 @@
+__pycache__
+.pytest_cache
+.vscode
+src/_temp
+NPC_Segmentation
+patch_texture
