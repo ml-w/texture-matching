@@ -102,7 +102,7 @@ class TestPatchPreprocessing(unittest.TestCase):
 
         df = get_features_from_image(img, seg, patch_size=16, include_vicinity=True, 
                                      pyrad_setting=self.pyrad_setting_file, dilate=20, shrink=2, 
-                                     num_worker=8)
+                                     num_workers=8)
         self.assertGreater(df.shape[0], 25 * 5) # There's 25 16x16 patches per slice and 5 slices to process
         
         

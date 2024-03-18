@@ -150,7 +150,7 @@ def get_features_from_image(im: sitk.Image,
                             patch_size: int, 
                             pyrad_setting: Union[Path, str], 
                             include_vicinity: Optional[bool] = False, 
-                            num_worker: Optional[int] = 1,
+                            num_workers: Optional[int] = 1,
                             **kwargs) -> pd.DataFrame:
     """Extracts features from an image using segmentation masks and PyRadiomics settings.
 
@@ -213,7 +213,8 @@ def get_features_from_image(im: sitk.Image,
     rows = []
     
     # Loop through each slice and extract features
-    if num_worker == 1:
+    if num_workers == 1:
+        logger.info("Not using MPI, this might take a while.")
         for idx in range(z, z+d + 1):
             # select the slice
             _im_slice = im[:, :,idx]  
@@ -224,13 +225,14 @@ def get_features_from_image(im: sitk.Image,
             if not o is None:    
                 rows.append(o)
     else:
-        pool = mpi.Pool(num_worker)
+        logger.info(f"Using MPI with {num_workers} workers.")
+        pool = mpi.Pool(num_workers)
         
         idxs = range(z, z + d + 1)
         args = [idxs, [im[:, :, idx] for idx in idxs], [seg[:, :, idx] for idx in idxs]]
         func = partial(_extract_eatures, patch_size = patch_size, include_vicinity = include_vicinity, pyrad_setting=pyrad_setting, **kwargs)
         
-        p = pool.starmap_async(func, repeat_zip(*args), chunksize=16)
+        p = pool.starmap_async(func, repeat_zip(*args))
         pool.close()
         
         while not p.ready():
@@ -238,6 +240,7 @@ def get_features_from_image(im: sitk.Image,
             # pbar.n = progress.value
             # pbar.refresh(nolock=False)
             time.sleep(0.1)
+            
         o = p.get()
         pool.join()
         
@@ -264,6 +267,7 @@ def _extract_eatures(i: int,
                      pyrad_setting: Union[str, Path]=None, **kwargs):
     """This is a helper function that is intended for mpi"""
     logger = MNTSLogger['texture-match.extract_features']
+    logger.info(f"Current thread: {mpi.current_process().name}")
     
     # Skip if found no labels
     if np.sum(sitk.GetArrayFromImage(seg_slice)) == 0:
@@ -283,7 +287,7 @@ def _extract_eatures(i: int,
         
     
     # If vicinity features are to be included
-    if include_vicinity:
+    if include_vicinity and o is not None:
         logger.info("Performing extraction for vicinity.")
         
         # Get vicinity segmentation slice
