@@ -105,7 +105,7 @@ def main(input_dir: Path,
         
         # * get features
         try:
-            if not all([
+            if not np.all([
                 np.isclose(sitk_im.GetSize(), sitk_seg.GetSize()),
                 np.isclose(sitk_im.GetSpacing(), sitk_seg.GetSpacing()),
                 np.isclose(sitk_im.GetOrigin(), sitk_seg.GetOrigin()),
