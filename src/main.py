@@ -23,16 +23,28 @@ radiomics.logger.setLevel(40)
 @click.argument('segment_dir', nargs=1, type=click.Path(exists=True, dir_okay=True, file_okay=False, path_type=Path))
 @click.argument('output_file', nargs=1, type=click.Path(path_type=Path))
 @click.option('-p', '--patch-size', default=16, type=click.IntRange(0, 128), help="Patch size")
-@click.option('--pyrad-setting-file', type=click.Path(exists=True, dir_okay=False), help='Pyradiomics settings yaml file.')
+@click.option('--pyrad-setting-file', type=click.Path(exists=True, dir_okay=False),
+              help='Pyradiomics settings yaml file.')
 @click.option('--id-globber', default=r"^\w+\d+")
-@click.option('--include-vicinity', default=False, is_flag=True, help="If true, extract features from vicinity as well.")
-@click.option('--vic-dilate-px', default=None, type=int, help='If not specified, this is calculated from patch_size.')
-@click.option('--vic-shrink-px', default=None, type=int, help="If not specified, this is calcualted from patch_size.")
-@click.option('--with-normalization', default=False, is_flag=True, help="Normalize input before extraction of features.")
-@click.option('--norm-graph', default=None, type=click.Path(exists=True, dir_okay=False), help="Path to normalization graph yaml file.")
-@click.option('--norm-states', default=None, type=click.Path(file_okay=False), help="Path to normalization state folder if requred.")
-@click.option('-n', '--num-workers', default=1, type=click.IntRange(0, mpi.cpu_count()), help="Number of workers. Default to 1.")
-@click.option('--log-dir', default=None, type=click.Path(path_type=Path), help="If specified, a log file will be written here.")
+@click.option('--include-vicinity', default=False, is_flag=True,
+              help="If true, extract features from vicinity as well.")
+@click.option('--vic-dilate-px', default=None, type=int,
+              help='If not specified, this is calculated from patch_size.')
+@click.option('--vic-shrink-px', default=None, type=int,
+              help="If not specified, this is calcualted from patch_size.")
+@click.option('--with-normalization', default=False, is_flag=True,
+              help="Normalize input before extraction of features.")
+@click.option('--norm-graph', default=None, type=click.Path(exists=True, dir_okay=False),
+              help="Path to normalization graph yaml file.")
+@click.option('--norm-states', default=None, type=click.Path(file_okay=False),
+              help="Path to normalization state folder if requred.")
+@click.option('-e', '--grid-sampling', default=0, type=click.IntRange(0, 128),
+              help="Patch grid overlap setting. If this > 0, patch grid with uniform overlap will be generate "
+                   "rather than exhaust all possible points.")
+@click.option('-n', '--num-workers', default=1, type=click.IntRange(0, mpi.cpu_count()),
+              help="Number of workers. Default to 1.")
+@click.option('--log-dir', default=None, type=click.Path(path_type=Path),
+              help="If specified, a log file will be written here.")
 @click.option('--debug', default=False, is_flag=True, help="If specified, only work on 1 case.")
 def main(input_dir: Path, 
          segment_dir: Path, 
@@ -47,6 +59,7 @@ def main(input_dir: Path,
          norm_graph: Optional[PathLike], 
          norm_states: Optional[PathLike], 
          num_workers: Optional[int],
+         grid_sampling: Optional[int],
          log_dir: Optional[PathLike], 
          debug: Optional[bool]):
     
@@ -86,6 +99,7 @@ def main(input_dir: Path,
             if f'/{idx}' in keys:
                 main_logger.info(f"Found key in output file, skipping {idx}")
                 continue
+            hdfstore.close()
 
 
         # * load image
@@ -117,7 +131,8 @@ def main(input_dir: Path,
                                         sitk_seg, 
                                         patch_size, 
                                         pyrad_setting=pyrad_setting_file, 
-                                        include_vicinity=include_vicinity, 
+                                        include_vicinity=include_vicinity,
+                                        grid_sampling=grid_sampling,
                                         num_workers=num_workers,
                                         dilate = vic_dilate_px,
                                         shrink = vic_shrink_px)
