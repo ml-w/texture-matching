@@ -48,8 +48,8 @@ class TestPatchSampling(unittest.TestCase):
         sitk_mask = sitk.GetImageFromArray(interpolated_mask[:, :])
         filled_hole = sitk.BinaryFillhole(sitk_mask, True)
 
-        patches, coords = sample_patches_exhaustive(filled_hole, filled_hole,  4, 1,
-                                                    return_coords=True, drop_last=False)
+        patches, coords = sample_patches_grid(filled_hole, filled_hole, 4, 1,
+                                              return_coords=True, drop_last=False)
         answer = [(2, 3) , (5, 3)  , (8, 3) , (11, 3) , (13, 3),
                   (2, 6) , (5, 6)  , (8, 6) , (11, 6) , (13, 6),
                   (2, 9) , (5, 9)  , (8, 9) , (11, 9) , (13, 9),

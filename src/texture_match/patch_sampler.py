@@ -127,12 +127,12 @@ def sample_patches(sitkslice: sitk.Image,
         return patch_stack
 
 
-def sample_patches_exhaustive(sitkslice: sitk.Image,
-                              sitkmask: sitk.Image,
-                              l: int,
-                              overlap: int,
-                              return_coords: Optional[bool] = False,
-                              drop_last: Optional[bool] = True) -> Union[sitk.Image, Tuple[sitk.Image, List[Tuple[int, int]]]]:
+def sample_patches_grid(sitkslice: sitk.Image,
+                        sitkmask: sitk.Image,
+                        l: int,
+                        overlap: int,
+                        return_coords: Optional[bool] = False,
+                        drop_last: Optional[bool] = True) -> Union[sitk.Image, Tuple[sitk.Image, List[Tuple[int, int]]]]:
     """Extracts an exhaustive grid of patches from a SimpleITK image slice.
 
     Processes a given image slice and its associated mask to create an exhaustive
@@ -169,10 +169,10 @@ def sample_patches_exhaustive(sitkslice: sitk.Image,
 
     Examples:
         To extract patches without coordinates:
-            >>> patches = sample_patches_exhaustive(image_slice, mask, 64, 32)
+            >>> patches = sample_patches_grid(image_slice, mask, 64, 32)
 
         To extract patches with coordinates:
-            >>> patches, coords = sample_patches_exhaustive(image_slice, mask, 64, 32, return_coords=True)
+            >>> patches, coords = sample_patches_grid(image_slice, mask, 64, 32, return_coords=True)
 
     .. note::
         - The patches are created by sliding a window of size `l` across the image with the given `overlap`.
