@@ -73,6 +73,8 @@ def main(input_dir: Path,
     if include_vicinity:
         vic_dilate_px = vic_dilate_px or int(patch_size * 2)
         vic_shrink_px = vic_shrink_px or vic_dilate_px // 4
+    if debug:
+        main_logger.set_global_log_level('debug')
     
     # Get IDs
     input_nifties = [l.name for l in input_dir.glob("*nii.gz")]
@@ -118,6 +120,7 @@ def main(input_dir: Path,
             pass
         # extract sub-calss
         if extract_class is not None:
+            main_logger.info(f"Extracting class {extract_class} in segmentation.")
             sitk_seg = sitk_seg == extract_class
         sitk_seg = sitk_seg != 0
         sitk_seg = sitk.Cast(sitk_seg, sitk.sitkUInt8)
@@ -131,9 +134,18 @@ def main(input_dir: Path,
                 np.isclose(sitk_im.GetSpacing(), sitk_seg.GetSpacing()),
                 np.isclose(sitk_im.GetOrigin(), sitk_seg.GetOrigin()),
             ]):
+                # Check origin distance greater than 15cm
+                if np.linalg.norm(np.array(sitk_im.GetOrigin()) - np.array(sitk_seg.GetOrigin())) > 150:
+                    main_logger.warn("There is a large origin displacement, please check your image and segmentation.")
+
                 #! This needs a unit test
                 main_logger.warning("Found discripency between image and segmentation pair, resampling segmentation.")
-                sitk_seg = sitk.Resample(sitk_seg, referenceImage=sitk_im)
+                main_logger.debug(f"{sitk_im.GetSize() = } -> {sitk_seg.GetSize() = } "
+                                  f"{sitk_im.GetSpacing() = } -> {sitk_seg.GetSpacing() = } "
+                                  f"{sitk_im.GetOrigin() = } -> {sitk_seg.GetOrigin() = } ")
+                sitk_seg = sitk.Resample(sitk_seg, referenceImage=sitk_im,
+                                         interpolator=sitk.sitkNearestNeighbor,
+                                         outputPixelType=sitk.sitkUInt8)
             df = get_features_from_image(sitk_im,
                                         sitk_seg, 
                                         patch_size, 
