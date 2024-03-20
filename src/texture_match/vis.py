@@ -18,7 +18,8 @@ def visualize_bbox(im: np.ndarray,
 
     Args:
         im (np.ndarray):
-            The input image on which to draw the bounding boxes.
+            The input image on which to draw the bounding boxes. The input should has
+            three channels RGB, ranged from 0 to 255.
         coords (np.ndarray):
             An array of coordinates where each row represents the top-left corner
             of a rectangle to be drawn.
@@ -42,7 +43,7 @@ def visualize_bbox(im: np.ndarray,
         ArithmeticError: If the zoom factor is less than 10, which would render the
             output image messy and indistinguishable.
 
-    .. notes::
+    .. note::
         - The input coordinates should be sorted beforehand if required, as this
           function does not sort the coordinates.
         - To avoid overlap of boxes and to make them distinct, the function may
@@ -116,49 +117,57 @@ def visualize_bbox_plt(im: np.ndarray,
                        coords: np.ndarray, 
                        box_size: int, 
                        thickness: Optional[int] = 1,
-                       zoom_factor: Optional[int] = 32, 
-                       box_color: Optional[Tuple[int, int, int]] = (255, 0, 0)) -> None:
+                       box_color: Optional[Tuple[int, int, int, int]] = (1., 0., 0., 1.),
+                       dpi: Optional[int] = 300) -> None:
     """Displays an image with bounding boxes overlay using matplotlib.
 
     This function takes an image and coordinates, and displays the image with
-    square bounding boxes drawn at the specified coordinates. The box size, 
+    square bounding boxes drawn at the specified coordinates. The box size,
     thickness, and color can be customized. The image is displayed using matplotlib's
     plotting capabilities.
 
     Args:
-        im (np.ndarray): 
+        im (np.ndarray):
             The input image on which to draw the bounding boxes.
-        coords (np.ndarray): 
+        coords (np.ndarray):
             An array of coordinates where each row represents the top-left corner
             of a bounding box to be drawn.
-        box_size (int): 
+        box_size (int):
             The size of the side of the square bounding box to draw.
-        thickness (int, optional): 
+        thickness (int, optional):
             The thickness of the lines used to draw the box edges. Defaults to 1.
-        zoom_factor (int, optional): 
-            The factor by which to scale the image before drawing the bounding boxes.
-            Defaults to 32. Note that in this function, this parameter is not used
-            and is included for consistency with related functions.
-        box_color (Tuple[int, int, int], optional): 
-            A tuple representing the color of the bounding box in RGB (red, green, blue)
-            format (matplotlib uses RGB instead of OpenCV's BGR). Defaults to red (255, 0, 0).
+        box_color (Tuple[int, int, int], optional):
+            The color of the box edges. A tuple representing the RGBA values in the range [0,1].
+            Defaults to red (1, 0, 0, 1).
+        dpi (int, optional):
+            The resolution of the figure in dots-per-inch. Defaults to 300.
 
-    .. notes::
-        - Matplotlib should be installed in the environment where this function is being used.
-        - This function is intended for interactive use to visually check bounding boxes and
-          is not suitable for saving or processing images at scale.
-        - The zoom_factor parameter is not utilized in the current implementation of the function
-          and is provided for API consistency with similar functions that do use it.
-        - The function does not return anything as it is meant for immediate visualization.
+    .. note:
+        - `im` must be a numpy array. If it contains an alpha channel (is RGBA), the values should
+          be in the range [0, 1]. If the image is RGB, grayscale, or otherwise, there are no specific
+          limitations on the value range.
+        - The function assumes `coords` provides the top-left corner of each bounding box. If you need
+          to specify the center, adjust the coordinates before passing them to the function.
+        - The parameter `box_color` should be a tuple of three elements if specifying an RGB color.
+          Each element should be a float in the range [0, 1] corresponding to the red, green, and blue
+          components of the color.
+        - The display is not persistent; it is closed after the `plt.show()` call completes. To save
+          the figure, you will need to call `plt.savefig()` before `plt.show()`.
+
+    Raises:
+        ValueError: If `coords` contains non-integer values or is not of shape Nx2.
+        TypeError: If `im` is not a numpy.ndarray.
     """
-    import matplotlib.pytplot as plt
+    import matplotlib.pyplot as plt
     import matplotlib.patches as patches
     
-    fig, ax = plt.subplots(1, 1, dpi=350)
+    fig, ax = plt.subplots(1, 1, dpi=dpi)
     ax.imshow(im)
     for _coords in coords:
-        _coords = _coords 
-        rect = patches.Rectangle(_coords - 0.5, box_size, box_size, linewidth=thickness, edgecolor=box_color, facecolor='none')
+        _coords = _coords
+        # coords is the center of the box
+        rect = patches.Rectangle(_coords - 0.5, box_size, box_size,
+                                 linewidth=thickness, edgecolor=box_color, facecolor='none')
         ax.add_patch(rect)
     plt.show()
     

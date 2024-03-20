@@ -1,6 +1,8 @@
 import unittest
 import numpy as np
+import cv2
 import sys
+from pprint import pprint, pformat
 sys.path.append('..')
 from texture_match.patch_sampler import *
 
@@ -41,5 +43,17 @@ class TestPatchSampling(unittest.TestCase):
             sample_patches(self.binary_mask_itk, self.binary_mask_itk, 4)
         
 
-        
-        
+    def test_sample_pathces_exhaustive(self):
+        interpolated_mask = cv2.resize(self.binary_mask, np.array(self.binary_mask.shape) * 2, interpolation=cv2.INTER_NEAREST)
+        sitk_mask = sitk.GetImageFromArray(interpolated_mask[:, :])
+        filled_hole = sitk.BinaryFillhole(sitk_mask, True)
+
+        patches, coords = sample_patches_exhaustive(filled_hole, filled_hole,  4, 1,
+                                                    return_coords=True, drop_last=False)
+        answer = [(2, 3) , (5, 3)  , (8, 3) , (11, 3) , (13, 3),
+                  (2, 6) , (5, 6)  , (8, 6) , (11, 6) , (13, 6),
+                  (2, 9) , (5, 9)  , (8, 9) , (11, 9) , (13, 9),
+                  (2, 12), (5, 12) , (8, 12), (11, 12), (13, 12),
+                  (2, 15), (5, 15) , (8, 15), (13, 15), (2 , 18),
+                  (5, 18), (8, 18)]
+        self.assertTrue(set(coords) == set(answer), pformat(f"{coords = },\n {answer = }", indent=2))
