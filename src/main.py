@@ -45,6 +45,9 @@ radiomics.logger.setLevel(40)
               help="Number of workers. Default to 1.")
 @click.option('--log-dir', default=None, type=click.Path(path_type=Path),
               help="If specified, a log file will be written here.")
+@click.option('--extract-class', default=None, type=click.IntRange(0, 255),
+              help="If specified, the specified segmentation label will be extracted from segmentation prior to "
+                   "calculating the feature values.")
 @click.option('--debug', default=False, is_flag=True, help="If specified, only work on 1 case.")
 def main(input_dir: Path, 
          segment_dir: Path, 
@@ -60,6 +63,7 @@ def main(input_dir: Path,
          norm_states: Optional[PathLike], 
          num_workers: Optional[int],
          grid_sampling: Optional[int],
+         extract_class: Optional[int],
          log_dir: Optional[PathLike], 
          debug: Optional[bool]):
     
@@ -112,6 +116,9 @@ def main(input_dir: Path,
                 raise ValueError("Must specify `norm_graph` and `norm_states` for `with_normalization`.")
             # Not implemented yet
             pass
+        # extract sub-calss
+        if extract_class is not None:
+            sitk_seg = sitk_seg == extract_class
         sitk_seg = sitk_seg != 0
         sitk_seg = sitk.Cast(sitk_seg, sitk.sitkUInt8)
         sitk_seg = slicewise_binary_opening(sitk_seg, kernelRadius=(3, 3))

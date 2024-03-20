@@ -32,7 +32,7 @@ def slicewise_operation(im: sitk.Image, func: Callable, axis: Optional[int]=-1) 
     axis = axis % im.GetDimension()
     num_slice = im.GetSize()[axis]
     
-        # Assuems the data type is uint8
+    # Assuems the data type is uint8
     new_im = sitk.Image(im)
     new_im[:] = 0
     for i in range(num_slice):
