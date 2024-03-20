@@ -91,7 +91,6 @@ class TestPatchPreprocessing(unittest.TestCase):
         self.assertGreater(df.shape[0], 1)
         
     def test_extract_features_from_image_mpi(self):
-        
         # Load image
         img = sitk.ReadImage("./test_data/images/MRI_01.nii.gz")
         seg = sitk.ReadImage("./test_data/segment/MRI_01.nii.gz", outputPixelType=sitk.sitkUInt8)
@@ -105,5 +104,16 @@ class TestPatchPreprocessing(unittest.TestCase):
                                      num_workers=8)
         self.assertGreater(df.shape[0], 25 * 5) # There's 25 16x16 patches per slice and 5 slices to process
         
-        
-    
+    def test_extract_features_from_image_exhaustive(self):
+        # Load image
+        img = sitk.ReadImage("./test_data/images/MRI_01.nii.gz")
+        seg = sitk.ReadImage("./test_data/segment/MRI_01.nii.gz", outputPixelType=sitk.sitkUInt8)
+
+        # Remake the segmentation
+        seg[:, :, :] = 0
+        seg[100:120, 100:120, 95:100] = 1
+
+        df = get_features_from_image(img, seg, patch_size=16, include_vicinity=True,
+                                     pyrad_setting=self.pyrad_setting_file, dilate=20, shrink=2,
+                                     num_workers=8, exhaustive_sampling=8, exhaustive_drop_last=False)
+        self.assertEqual(df.shape[0], 20) # There's 4 16x16 patches per slice and 5 slices to process

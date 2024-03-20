@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional, Any, Union, Tuple
 
 from pexpect import EOF
-from .patch_sampler import find_square_patches, sample_patches
+from .patch_sampler import find_square_patches, sample_patches, sample_patches_exhaustive
 from mnts.mnts_logger import MNTSLogger
 from mnts.utils import repeat_zip
 
@@ -130,20 +130,29 @@ def get_features_from_patch_stack(stack: sitk.Image, pyrad_setting: Union[Path, 
     return df
     
 
-def get_features_from_slice(im_slice: sitk.Image, 
-                            seg_slice: sitk.Image, 
-                            patch_size: int, 
-                            pyrad_setting: Union[Path, str]) -> pd.DataFrame:
+def get_features_from_slice(im_slice: sitk.Image,
+                            seg_slice: sitk.Image,
+                            patch_size: int,
+                            pyrad_setting: Union[Path, str],
+                            exhaustive_sampling: Optional[int] = 0,
+                            exhaustive_drop_last: Optional[bool] = False) -> pd.DataFrame:
     """Get features from slice"""
+    if exhaustive_sampling < 0:
+        warnings.warn(f"Incorrect setting for exhaustive_sample: {exhaustive_sampling}")
 
     # Get patch stack
-    patch_stack, patch_coords = sample_patches(im_slice, seg_slice, patch_size, return_coords=True)
+    if exhaustive_sampling > 0:
+        patch_stack, patch_coords = sample_patches_exhaustive(im_slice, seg_slice, patch_size, exhaustive_sampling,
+                                                              return_coords=True,
+                                                              drop_last=exhaustive_drop_last)
+    else:
+        patch_stack, patch_coords = sample_patches(im_slice, seg_slice, patch_size, return_coords=True)
     
     # Extract features
     feats = get_features_from_patch_stack(patch_stack, pyrad_setting=pyrad_setting)
 
     # attach the corner indice of patches to features
-    feats['Patch Corner Coordinate'] = patch_coords
+    feats[('Extract Parameters', 'Index', 'Patch Corner Coordinate')] = patch_coords
     
     return feats
 
@@ -154,6 +163,8 @@ def get_features_from_image(im: sitk.Image,
                             pyrad_setting: Union[Path, str], 
                             include_vicinity: Optional[bool] = False, 
                             num_workers: Optional[int] = 1,
+                            exhaustive_sampling: Optional[int] = 0,
+                            exhaustive_drop_last: Optional[bool] = False,
                             **kwargs) -> pd.DataFrame:
     """Extracts features from an image using segmentation masks and PyRadiomics settings.
 
@@ -172,6 +183,14 @@ def get_features_from_image(im: sitk.Image,
         include_vicinity (bool, Optional): 
             Flag indicating whether to include features from the vicinity of the segmented region.
             Defaults to False.
+        num_workers (int, Optional):
+            Number of workers for MPI feature extracting. Each process will extract features from one
+            patch stack. Default to 1, meaning no MPI.
+        exhaustive_sampling (int, Optional):
+            Overlap setting for exhaustive setting, exhaustive setting will be activated if this
+            arguement > 0. Include vicinity has no effect if this is > 0. Default to 0.
+        exhaustive_drop_last (bool, Optional):
+            If `True`, the last patch will be dropped so that all patches are equally spaced.
         **kwargs:
             Additional keyword arguments to be passed to `get_vacinity_segment_slice`.
 
@@ -182,11 +201,14 @@ def get_features_from_image(im: sitk.Image,
         ValueError: If the image and segmentation size, origin, or direction do not match.
 
     .. notes:
-        - You should perform normalization normalization prior to using this fucntion.
+        - You should perform normalization prior to using this function.
         - The function assumes that the last axis of the image is the slice axis.
         - This function checks the `Size`, `Origin` and `Direction` of the input image and segmentation
         - The output DataFrame will have a multi-index if `include_vicinity` is True, and a single
           index otherwise.
+
+    See Also:
+        :func:`texture_match.patch_sampler.sample_patches_exhaustive`
 
     """
     logger = MNTSLogger['extract-features']
@@ -224,6 +246,8 @@ def get_features_from_image(im: sitk.Image,
             _seg_slice = seg[:, :,idx] 
             
             o = _extract_features(idx, _im_slice, _seg_slice, patch_size=patch_size,
+                                  exhaustive_sampling=exhaustive_sampling,
+                                  exhaustive_droplast=exhaustive_drop_last,
                                   include_vicinity=include_vicinity, pyrad_setting=pyrad_setting, **kwargs)
             if not o is None:    
                 rows.append(o)
@@ -233,7 +257,10 @@ def get_features_from_image(im: sitk.Image,
         
         idxs = range(z, z + d + 1)
         args = [idxs, [im[:, :, idx] for idx in idxs], [seg[:, :, idx] for idx in idxs]]
-        func = partial(_extract_features, patch_size = patch_size, include_vicinity = include_vicinity, pyrad_setting=pyrad_setting, **kwargs)
+        func = partial(_extract_features, patch_size = patch_size,
+                       exhaustive_sampling=exhaustive_sampling,
+                       exhaustive_droplast=exhaustive_drop_last,
+                       include_vicinity = include_vicinity, pyrad_setting=pyrad_setting, **kwargs)
         
         p = pool.starmap_async(func, repeat_zip(*args))
         pool.close()
@@ -267,7 +294,10 @@ def _extract_features(i: int,
                       seg_slice: sitk.Image,
                       patch_size: int=None,
                       include_vicinity: bool=None,
-                      pyrad_setting: Union[str, Path]=None, **kwargs):
+                      pyrad_setting: Union[str, Path]=None,
+                      exhaustive_sampling: Optional[int] = 0,
+                      exhaustive_droplast: Optional[bool] = False,
+                      **kwargs):
     """This is a helper function that is intended for mpi"""
     logger = MNTSLogger['texture-match.extract_features']
     logger.info(f"Current thread: {mpi.current_process().name}")
@@ -278,9 +308,12 @@ def _extract_features(i: int,
     
     # Get features from the current slice
     try:
-        feat_target = get_features_from_slice(im_slice, seg_slice, patch_size, pyrad_setting)
-        feat_target['SliceIndex'] = i
-        feat_target['Vicinity'] = False
+        feat_target = get_features_from_slice(im_slice, seg_slice, patch_size, pyrad_setting,
+                                              exhaustive_sampling=exhaustive_sampling,
+                                              exhaustive_drop_last=exhaustive_droplast)
+        feat_target[('Extract Parameters', 'Index', 'Slice Index')] = i
+        feat_target[('Extract Parameters', 'Flags', 'Vicinity')] = False
+        feat_target[('Extract Parameters', 'Settings', 'Exhaustive Overlap')] = exhaustive_sampling
         o = feat_target
     except ValueError as e:
         # when the segmentation is too small and there are no square that can be fitted, skip this slice
@@ -290,7 +323,7 @@ def _extract_features(i: int,
         
     
     # If vicinity features are to be included
-    if include_vicinity and o is not None:
+    if include_vicinity and o is not None and exhaustive_sampling <= 0:
         logger.info("Performing extraction for vicinity.")
         
         # Get vicinity segmentation slice
@@ -302,8 +335,9 @@ def _extract_features(i: int,
         # Get features from the vicinity of the current slice
         try:
             feat_vic = get_features_from_slice(im_slice, vic_seg_slice, patch_size, pyrad_setting)
-            feat_vic['SliceIndex'] = i
-            feat_vic['Vicinity'] = True
+            feat_target[('Extract Parameters', 'Index', 'Slice Index')] = i
+            feat_target[('Extract Parameters', 'Flags', 'Vicinity')] = True
+            feat_target[('Extract Parameters', 'Settings', 'Exhaustive Overlap')] = 0
             o = pd.concat([feat_target, feat_vic], axis=0)
         except ValueError as e:
             logger.info(f"Vicinity cannot fit any squares of patch size: {patch_size}")

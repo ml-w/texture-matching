@@ -133,6 +133,55 @@ def sample_patches_exhaustive(sitkslice: sitk.Image,
                               overlap: int,
                               return_coords: Optional[bool] = False,
                               drop_last: Optional[bool] = True) -> Union[sitk.Image, Tuple[sitk.Image, List[Tuple[int, int]]]]:
+    """Extracts an exhaustive grid of patches from a SimpleITK image slice.
+
+    Processes a given image slice and its associated mask to create an exhaustive
+    grid of patches. The patches are of a specified size and are extracted with a
+    specified overlap. This function includes patches having at least `l` pixels
+    of segmentation in the patch. Optionally, it can also return the coordinates
+    of the top-left corner of each patch within the original image slice.
+
+    Args:
+        sitkslice (sitk.Image):
+            The SimpleITK image slice from which patches are to be extracted.
+        sitkmask (sitk.Image):
+            The SimpleITK mask image used to determine the region of interest for patch extraction.
+        l (int):
+            The side length of each square patch.
+        overlap (int):
+            The overlap between consecutive patches, in pixels.
+        return_coords (bool, optional):
+            If True, additionally returns the top-left coordinates of each patch within the original image slice.
+            Defaults to False.
+        drop_last (bool, optional):
+            If True, patches that would fall partially outside the image bounds are dropped.
+            Defaults to True.
+
+    Returns:
+        Union[sitk.Image, Tuple[sitk.Image, List[Tuple[int, int]]]]:
+            A SimpleITK Image containing the patches if `return_coords` is False.
+            If `return_coords` is True, a tuple containing the SimpleITK Image of patches and a list of tuples
+            with each tuple containing the x and y coordinates of the top-left corner of each patch.
+
+    Raises:
+        ValueError:
+            If `l` or `overlap` is less than 1, or if `overlap` is greater than or equal to `l`.
+
+    Examples:
+        To extract patches without coordinates:
+            >>> patches = sample_patches_exhaustive(image_slice, mask, 64, 32)
+
+        To extract patches with coordinates:
+            >>> patches, coords = sample_patches_exhaustive(image_slice, mask, 64, 32, return_coords=True)
+
+    .. note::
+        - The patches are created by sliding a window of size `l` across the image with the given `overlap`.
+        - The function calculates a bounding box from the mask to identify the region of interest.
+        - Patches that do not contain a minimum number of non-zero pixels from the mask are excluded if
+          `drop_last` is True. The minimum number is equal to the side length `l`.
+        - The coordinates returned (if `return_coords` is True) are adjusted to account for the original
+          position of the bounding box within the full image slice.
+    """
     if l < 1 or overlap < 1:
         raise ValueError(f"Argument `l` and `overlap` must be greater than 1.")
 
@@ -147,8 +196,8 @@ def sample_patches_exhaustive(sitkslice: sitk.Image,
     im_slice  = sitkslice[x:x+w, y:y+h]
     seg_slice = sitkmask[x:x+w, y:y+h]
 
-    vert_coords = np.arange(0, y+h, l - overlap).tolist()
-    horz_coords = np.arange(0, x+w, l - overlap).tolist()
+    vert_coords = np.arange(0, h, l - overlap).tolist()
+    horz_coords = np.arange(0, w, l - overlap).tolist()
 
     # * prevents last patch falling out of map
     while (h - l) <= vert_coords[-1]:
