@@ -8,9 +8,9 @@ from mnts.utils import load_supervised_pair_by_IDs, get_unique_IDs
 from mnts.mnts_logger import MNTSLogger
 from typing import Optional, List, Tuple, Any, Union
 
-from traitlets import default
 from texture_match.extract_features import *
 from texture_match.im_ops import *
+from functools import partial
 
 PathLike = Union[Path, str]
 
@@ -41,6 +41,8 @@ radiomics.logger.setLevel(40)
 @click.option('-e', '--grid-sampling', default=0, type=click.IntRange(0, 128),
               help="Patch grid overlap setting. If this > 0, patch grid with uniform overlap will be generate "
                    "rather than exhaust all possible points.")
+@click.option('--pre-extraction-tweak', default=0, type=click.IntRange(-128, 128),
+              help="Dilate or shrink mask prior to feature extraction.")
 @click.option('-n', '--num-workers', default=1, type=click.IntRange(0, mpi.cpu_count()),
               help="Number of workers. Default to 1.")
 @click.option('--log-dir', default=None, type=click.Path(path_type=Path),
@@ -63,6 +65,7 @@ def main(input_dir: Path,
          norm_states: Optional[PathLike], 
          num_workers: Optional[int],
          grid_sampling: Optional[int],
+         pre_extraction_tweak: Optional[int],
          extract_class: Optional[int],
          log_dir: Optional[PathLike], 
          debug: Optional[bool]):
@@ -124,6 +127,13 @@ def main(input_dir: Path,
             sitk_seg = sitk_seg == extract_class
         sitk_seg = sitk_seg != 0
         sitk_seg = sitk.Cast(sitk_seg, sitk.sitkUInt8)
+        # dilate or shrink
+        if not pre_extraction_tweak == 0:
+            if pre_extraction_tweak < 0:
+                tweak_func = partial(sitk.BinaryErode, kernelRadius=(pre_extraction_tweak, pre_extraction_tweak))
+            else:
+                tweak_func = partial(sitk.BinaryDilate, kernelRadius=(pre_extraction_tweak, pre_extraction_tweak))
+            sitk_seg = slicewise_operation(sitk_seg, tweak_func)
         sitk_seg = slicewise_binary_opening(sitk_seg, kernelRadius=(3, 3))
         
         

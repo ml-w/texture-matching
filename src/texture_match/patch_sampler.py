@@ -200,15 +200,22 @@ def sample_patches_grid(sitkslice: sitk.Image,
     horz_coords = np.arange(0, w, l - overlap).tolist()
 
     # * prevents last patch falling out of map
-    while (h - l) <= vert_coords[-1]:
-        vert_coords.pop(-1)
+    try:
+        while (h - l) <= vert_coords[-1]:
+            vert_coords.pop(-1)
 
-    while (w - l) <= horz_coords[-1]:
-        horz_coords.pop(-1)
+        while (w - l) <= horz_coords[-1]:
+            horz_coords.pop(-1)
 
-    if not drop_last:
-        vert_coords.append(h - l)
-        horz_coords.append(w - l)
+        if not drop_last:
+            vert_coords.append(h - l)
+            horz_coords.append(w - l)
+    except IndexError:
+        # warn about not enough space within segmentation
+        msg = f"Square grid with size {l} cannot fit into the segmetnation. "
+        raise IndexError(msg)
+        
+
 
     xx, yy = np.meshgrid(horz_coords, vert_coords)
     coords  = np.stack([xx.ravel(),yy.ravel()], axis=1).tolist() # add back the bounding box coordinates
