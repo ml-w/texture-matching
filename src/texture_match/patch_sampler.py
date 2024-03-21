@@ -241,3 +241,65 @@ def sample_patches_grid(sitkslice: sitk.Image,
         return patch_stack, [(p[0] + x, p[1] + y) for p in coords]
     else:
         return patch_stack
+
+
+def sample_patches_random(sitkslice: sitk.Image,
+                          sitkmask: sitk.Image,
+                          l: int,
+                          n: int,
+                          return_coords: Optional[bool] = False) -> Union[sitk.Image, Tuple[sitk.Image, List[Tuple[int, int]]]]:
+    """Extracts square patches from a 2D image slice based on a segmentation mask.
+
+    Args:
+        sitkslice (sitk.Image):
+            A 2D image slice from which patches will be extracted.
+        sitkmask (sitk.LabelImage):
+            The 2D segmentation mask that determines the region of interest in the image slice.
+        l (int):
+            The side length in pixels of the square patches to be extracted.
+        n (int):
+            Number of samples.
+        return_coords (bool):
+            If specified, return also the patch coords.
+
+    Returns:
+        sitk.Image:
+            An image object containing the stacked extracted patches. The origin is set to (0, 0, 0) and
+            the spacing is set to (1, 1, 1).
+        List[(int, int)]:
+            A list of tuple of two coordinates
+    """
+    # * Get patches
+    # numpy version
+    np_im_slice = sitk.GetArrayFromImage(sitkslice)
+    np_seg_slice = sitk.GetArrayFromImage(sitkmask)
+
+    # Shrink segment to valid bound
+    np_seg_slice[:l // 2+1, :] = 0
+    np_seg_slice[-l // 2:, :] = 0
+    np_seg_slice[:, -l // 2:] = 0
+    np_seg_slice[:, :l // 2 + 1] = 0
+
+    # Get all possible squares with correct size
+    valid_coords = np.array(np.where(np_seg_slice != 0)).T - l // 2 # Shift the cord to corner
+    # TODO: Need to add check check coords falling out of image
+
+
+    patches = np.random.choice(np.arange(len(valid_coords)), size=n)
+    patches = valid_coords[patches]
+
+    if not len(patches):
+        msg = f"Cannot find any squares with size {l} that can fit into the segmentation!"
+        raise ValueError(msg)
+
+    # Extract patches from original images
+    #! Note there's no tranpose of i, j because numpy array was used to get the patch coords
+    patch_stack = np.stack([np_im_slice[j:j+l, i:i+l] for j, i in patches])
+
+    # * Convert patch_stack to sitk image
+    patch_stack = sitk.GetImageFromArray(patch_stack)
+    if return_coords:
+        #! Transpose is here instead!
+        return patch_stack, [(p[1], p[0]) for p in patches]
+    else:
+        return patch_stack

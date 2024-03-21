@@ -35,7 +35,7 @@ class TestPatchPreprocessing(unittest.TestCase):
         return super().setUp()
     
     def test_get_vacinity_segment(self):
-        x = get_vacinity_segment_slice(self.binary_image_sitk, dilate=3, shrink = 1)
+        x = get_vicinity_segment_slice(self.binary_image_sitk, dilate=3, shrink = 1)
         x = sitk.GetArrayFromImage(x)
         
         target = np.array([
@@ -117,3 +117,17 @@ class TestPatchPreprocessing(unittest.TestCase):
                                      pyrad_setting=self.pyrad_setting_file, dilate=20, shrink=2,
                                      num_workers=8, grid_sampling=8, grid_drop_last=False)
         self.assertEqual(df.shape[0], 20) # There's 4 16x16 patches per slice and 5 slices to process
+
+    def test_extract_features_randomly(self):
+        # Load image
+        img = sitk.ReadImage("./test_data/images/MRI_01.nii.gz")
+        seg = sitk.ReadImage("./test_data/segment/MRI_01.nii.gz", outputPixelType=sitk.sitkUInt8)
+
+        # Remake the segmentation
+        seg[:, :, :] = 0
+        seg[100:120, 100:120, 95:100] = 1
+
+        df = get_features_from_image(img, seg, patch_size=16, include_vicinity=True,
+                                     pyrad_setting=self.pyrad_setting_file, dilate=20, shrink=2,
+                                     num_workers=8, random_sampling=8, grid_drop_last=False)
+        self.assertEqual(df.shape[0], 25 * 5 + 5 * 8)  # There's 25 16x16 patches per slice and 5 slices to process

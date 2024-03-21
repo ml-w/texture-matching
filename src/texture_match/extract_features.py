@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional, Any, Union, Tuple
 
 from pexpect import EOF
-from .patch_sampler import find_square_patches, sample_patches, sample_patches_grid
+from .patch_sampler import find_square_patches, sample_patches, sample_patches_grid, sample_patches_random
 from mnts.mnts_logger import MNTSLogger
 from mnts.utils import repeat_zip
 
@@ -18,9 +18,9 @@ import multiprocessing as mpi
 warnings.filterwarnings('ignore', category=UserWarning)
 
 
-def get_vacinity_segment_slice(seg_slice: sitk.Image, 
-                              dilate: Optional[int] = 16, 
-                              shrink: Optional[int] = None) -> sitk.Image:
+def get_vicinity_segment_slice(seg_slice: sitk.Image,
+                               dilate: Optional[int] = 16,
+                               shrink: Optional[int] = None) -> sitk.Image:
     """Generates a vicinity segmentation slice from an input segmentation slice.
 
     The input segmentation slice is first dilated by a specified number of pixels to include adjacent
@@ -135,16 +135,23 @@ def get_features_from_slice(im_slice: sitk.Image,
                             patch_size: int,
                             pyrad_setting: Union[Path, str],
                             grid_sampling: Optional[int] = 0,
-                            grid_drop_last: Optional[bool] = False) -> pd.DataFrame:
+                            grid_drop_last: Optional[bool] = False,
+                            random_sampling: Optional[int] = 0) -> pd.DataFrame:
     """Get features from slice"""
     if grid_sampling < 0:
         warnings.warn(f"Incorrect setting for `grid_sampling`: {grid_sampling}")
+    if random_sampling < 0:
+        warnings.warn(f"Incorrect setting for `random_sampling`: {random_sampling}")
 
     # Get patch stack
     if grid_sampling > 0:
         patch_stack, patch_coords = sample_patches_grid(im_slice, seg_slice, patch_size, grid_sampling,
                                                         return_coords=True,
                                                         drop_last=grid_drop_last)
+    elif random_sampling > 0:
+        # Randomly select from mask image
+        patch_stack, patch_coords = sample_patches_random(im_slice, seg_slice, patch_size, random_sampling,
+                                                          return_coords=True)
     else:
         patch_stack, patch_coords = sample_patches(im_slice, seg_slice, patch_size, return_coords=True)
     
@@ -165,6 +172,7 @@ def get_features_from_image(im: sitk.Image,
                             num_workers: Optional[int] = 1,
                             grid_sampling: Optional[int] = 0,
                             grid_drop_last: Optional[bool] = False,
+                            random_sampling: Optional[int] = 0,
                             **kwargs) -> pd.DataFrame:
     """Extracts features from an image using segmentation masks and PyRadiomics settings.
 
@@ -191,6 +199,9 @@ def get_features_from_image(im: sitk.Image,
             arguement > 0. Include vicinity has no effect if this is > 0. Default to 0.
         grid_drop_last (bool, Optional):
             If `True`, the last patch will be dropped so that all patches are equally spaced.
+        random_sampling (int, Optional):
+            If not 0, will perform random sampling from vicinity slice, only effective when vicinity slice
+            extraction is on.
         **kwargs:
             Additional keyword arguments to be passed to `get_vacinity_segment_slice`.
 
@@ -248,6 +259,7 @@ def get_features_from_image(im: sitk.Image,
             o = _extract_features(idx, _im_slice, _seg_slice, patch_size=patch_size,
                                   grid_sampling=grid_sampling,
                                   grid_drop_last=grid_drop_last,
+                                  random_sampling=random_sampling,
                                   include_vicinity=include_vicinity, pyrad_setting=pyrad_setting, **kwargs)
             if not o is None:    
                 rows.append(o)
@@ -260,6 +272,7 @@ def get_features_from_image(im: sitk.Image,
         func = partial(_extract_features, patch_size = patch_size,
                        grid_sampling=grid_sampling,
                        grid_drop_last=grid_drop_last,
+                       random_sampling=random_sampling,
                        include_vicinity = include_vicinity, pyrad_setting=pyrad_setting, **kwargs)
         
         p = pool.starmap_async(func, repeat_zip(*args))
@@ -297,6 +310,7 @@ def _extract_features(i: int,
                       pyrad_setting: Union[str, Path]=None,
                       grid_sampling: Optional[int] = 0,
                       grid_drop_last: Optional[bool] = False,
+                      random_sampling: Optional[int] = 0,
                       **kwargs):
     """This is a helper function that is intended for mpi"""
     logger = MNTSLogger['texture-match.extract_features']
@@ -327,14 +341,15 @@ def _extract_features(i: int,
         logger.info("Performing extraction for vicinity.")
         
         # Get vicinity segmentation slice
-        vic_seg_slice = get_vacinity_segment_slice(seg_slice, **kwargs)
+        vic_seg_slice = get_vicinity_segment_slice(seg_slice, **kwargs)
         if np.sum(sitk.GetArrayFromImage(vic_seg_slice)) == 0:
             logger.warning("Nothing returned from vicinity dilate and shrink.")
             return  o 
             
         # Get features from the vicinity of the current slice
         try:
-            feat_vic = get_features_from_slice(im_slice, vic_seg_slice, patch_size, pyrad_setting)
+            feat_vic = get_features_from_slice(im_slice, vic_seg_slice, patch_size, pyrad_setting,
+                                               random_sampling=random_sampling)
             feat_vic[('Extract Parameters', 'Index', 'Slice Index')] = i
             feat_vic[('Extract Parameters', 'Flags', 'Vicinity')] = True
             feat_vic[('Extract Parameters', 'Settings', 'Grid Overlap')] = 0

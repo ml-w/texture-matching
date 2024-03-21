@@ -1,6 +1,7 @@
 from multiprocessing import Value
 from os import path
 import click
+from matplotlib.pylab import rand
 import pandas as pd
 import radiomics
 from pathlib import Path
@@ -32,6 +33,8 @@ radiomics.logger.setLevel(40)
               help='If not specified, this is calculated from patch_size.')
 @click.option('--vic-shrink-px', default=None, type=int,
               help="If not specified, this is calcualted from patch_size.")
+@click.option('--vic-random-sampling', default=0, type=click.IntRange(0), 
+              help="If > 0, randomly sample from vicinity segment instead of exhaustively.")
 @click.option('--with-normalization', default=False, is_flag=True,
               help="Normalize input before extraction of features.")
 @click.option('--norm-graph', default=None, type=click.Path(exists=True, dir_okay=False),
@@ -60,6 +63,7 @@ def main(input_dir: Path,
          include_vicinity: Optional[bool], 
          vic_dilate_px: Optional[int],
          vic_shrink_px: Optional[int],
+         vic_random_sampling: Optional[int],
          with_normalization: Optional[bool], 
          norm_graph: Optional[PathLike], 
          norm_states: Optional[PathLike], 
@@ -163,6 +167,7 @@ def main(input_dir: Path,
                                         include_vicinity=include_vicinity,
                                         grid_sampling=grid_sampling,
                                         num_workers=num_workers,
+                                        random_sampling=vic_random_sampling,
                                         dilate = vic_dilate_px,
                                         shrink = vic_shrink_px)
             
