@@ -335,9 +335,9 @@ def _extract_features(i: int,
         # Get features from the vicinity of the current slice
         try:
             feat_vic = get_features_from_slice(im_slice, vic_seg_slice, patch_size, pyrad_setting)
-            feat_target[('Extract Parameters', 'Index', 'Slice Index')] = i
-            feat_target[('Extract Parameters', 'Flags', 'Vicinity')] = True
-            feat_target[('Extract Parameters', 'Settings', 'Grid Overlap')] = 0
+            feat_vic[('Extract Parameters', 'Index', 'Slice Index')] = i
+            feat_vic[('Extract Parameters', 'Flags', 'Vicinity')] = True
+            feat_vic[('Extract Parameters', 'Settings', 'Grid Overlap')] = 0
             o = pd.concat([feat_target, feat_vic], axis=0)
         except ValueError as e:
             logger.info(f"Vicinity cannot fit any squares of patch size: {patch_size}")
