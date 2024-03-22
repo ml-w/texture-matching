@@ -164,7 +164,7 @@ def main(input_dir: Path,
         if not pre_extraction_tweak == 0:
             if pre_extraction_tweak < 0:
                 tweak_func = partial(sitk.BinaryErode, kernelRadius=(pre_extraction_tweak, pre_extraction_tweak))
-        else:
+            else:
                 tweak_func = partial(sitk.BinaryDilate, kernelRadius=(pre_extraction_tweak, pre_extraction_tweak))
             sitk_seg = slicewise_operation(sitk_seg, tweak_func)
         sitk_seg = slicewise_binary_opening(sitk_seg, kernelRadius=(3, 3))
