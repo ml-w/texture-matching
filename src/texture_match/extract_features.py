@@ -56,7 +56,7 @@ def get_vicinity_segment_slice(seg_slice: sitk.Image,
     shrink = shrink or dilate // 4
     logger.info(f"{shrink = }, {dilate = }")
     
-        
+
     # * Dilate the patches for capturing vicinity non-cancer tissues
     seg_dilated = sitk.BinaryDilate(seg_slice, kernelRadius = [dilate, dilate])
     seg_non_cancer = seg_dilated - seg_slice
@@ -120,12 +120,15 @@ def get_features_from_patch_stack(stack: sitk.Image, pyrad_setting: Union[Path, 
         temp_seg_dir = temp_path / "SEG"
         temp_im_dir.mkdir()
         temp_seg_dir.mkdir()
-        
+
+        # There's a limit in NIFTI's Dimension ~32000. If stack is over this number,
         sitk.WriteImage(stack, temp_im_dir / "Temp_Image.nii.gz")
         sitk.WriteImage(dummy_seg_stack, temp_seg_dir / "Temp_segment.nii.gz")
         
         fe = mradtk.FeatureExtractor(id_globber="Temp", param_file=str(pyrad_setting), by_slice=2)
-        df = fe.extract_features(temp_im_dir, temp_seg_dir, by_slice=2, num_workers=1) # pointless to set num worker > 1 because this reads one image only.
+        # pointless to set num worker > 1 because this reads one image only. Implementation within mradtk is
+        # pooled for working on multiple images rather than multiple slices in the same image.
+        df = fe.extract_features(temp_im_dir, temp_seg_dir, by_slice=2, num_workers=1)
         
     return df
     
@@ -196,7 +199,8 @@ def get_features_from_image(im: sitk.Image,
             patch stack. Default to 1, meaning no MPI.
         grid_sampling (int, Optional):
             Overlap setting grid patch generation, grid patch setting will be activated if this
-            arguement > 0. Include vicinity has no effect if this is > 0. Default to 0.
+            arguement > 0. Use it with pre-extraction tweak option to increase the sampling area.
+            Include vicinity has no effect if this is > 0. Default to 0.
         grid_drop_last (bool, Optional):
             If `True`, the last patch will be dropped so that all patches are equally spaced.
         random_sampling (int, Optional):
@@ -336,7 +340,7 @@ def _extract_features(i: int,
         o = None
         
     
-    # If vicinity features are to be included
+    # # If vicinity features are to be included
     if include_vicinity and o is not None and grid_sampling <= 0:
         logger.info("Performing extraction for vicinity.")
         

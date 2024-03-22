@@ -18,6 +18,25 @@ PathLike = Union[Path, str]
 # mute radiomics logger
 radiomics.logger.setLevel(40)
 
+# Some parameter settings to make click more friendly
+class IDListParamType(click.ParamType):
+    name = 'idlist'
+
+    def convert(self, value, param, ctx) -> List[str]:
+        try:
+            if value is None:
+                return None
+
+            if value.startswith('[') and value.endswith(']'):
+                id_list = value[1:-1].split(',')
+                # Strip whitespace and filter out empty strings
+                return [id_str.strip() for id_str in id_list if id_str.strip()]
+            else:
+                self.fail('ID list must start with "[" and end with "]" and contain IDs separated by commas.',
+                          param, ctx)
+        except ValueError as e:
+            self.fail(f'Could not parse ID list: {e}', param, ctx)
+
 
 @click.command()
 @click.argument('input_dir', nargs=1, type=click.Path(exists=True, dir_okay=True, file_okay=False, path_type=Path))
@@ -48,6 +67,10 @@ radiomics.logger.setLevel(40)
               help="Dilate or shrink mask prior to feature extraction.")
 @click.option('-n', '--num-workers', default=1, type=click.IntRange(0, mpi.cpu_count()),
               help="Number of workers. Default to 1.")
+@click.option('--idlist', default=None, type=IDListParamType(),
+              help="Specify the ids. Default behavior glob all viable IDs.")
+@click.option('--overwrite', default=0, is_flag=True,
+              help="If true, overwrite the key in the output HDF5 if it exists. Default behavior is skipping.")
 @click.option('--log-dir', default=None, type=click.Path(path_type=Path),
               help="If specified, a log file will be written here.")
 @click.option('--extract-class', default=None, type=click.IntRange(0, 255),
@@ -65,9 +88,11 @@ def main(input_dir: Path,
          vic_shrink_px: Optional[int],
          vic_random_sampling: Optional[int],
          with_normalization: Optional[bool], 
-         norm_graph: Optional[PathLike], 
+         norm_graph: Optional[PathLike],
          norm_states: Optional[PathLike], 
          num_workers: Optional[int],
+         idlist: Optional[Tuple[str]],
+         overwrite: Optional[bool],
          grid_sampling: Optional[int],
          pre_extraction_tweak: Optional[int],
          extract_class: Optional[int],
@@ -89,12 +114,17 @@ def main(input_dir: Path,
     input_ids = get_unique_IDs(input_nifties, globber=id_globber)
     seg_ids = get_unique_IDs(seg_nifties, globber=id_globber)
 
-    # Operate only on IDs that has overlap    
-    idlist = list(set(input_ids) & set(seg_ids))
-    idlist.sort()
+    # * Operate only on IDs that has overlap
+    intersection = list(set(input_ids) & set(seg_ids))
+    intersection.sort()
+    if idlist is not None:
+        idlist = set(idlist)
+        idlist = list(set(intersection) & idlist)
+    else:
+        idlist = intersection
     main_logger.info(f"Working on ID list: {idlist}")
     
-    # pairs to process
+    # * pairs to process
     pairs: Tuple[Path, Path] = load_supervised_pair_by_IDs(input_dir, segment_dir, globber=id_globber, return_pairs=True, idlist=idlist)
     pairs = {k: v for k, v in zip(idlist, pairs)} # Note this works only if id list is sorted
     
@@ -104,15 +134,14 @@ def main(input_dir: Path,
 
         # * check if file is already processed
         out_name = output_file.with_suffix('.h5')
-        if out_name.is_file():
+        if out_name.is_file() and not overwrite:
             main_logger.info("Found existing HDF5 store, trying to continue from existing work.")
-            hdfstore = pd.HDFStore(out_name)
-            keys = list(hdfstore.keys())
-            main_logger.info(f"Existing keys: {keys}")
-            if f'/{idx}' in keys:
-                main_logger.info(f"Found key in output file, skipping {idx}")
-                continue
-            hdfstore.close()
+            with pd.HDFStore(out_name) as hdfstore:
+                keys = list(hdfstore.keys())
+                main_logger.info(f"Existing keys: {keys}")
+                if f'/{idx}' in keys:
+                    main_logger.info(f"Found key in output file, skipping {idx}")
+                    continue
 
 
         # * load image
@@ -135,7 +164,7 @@ def main(input_dir: Path,
         if not pre_extraction_tweak == 0:
             if pre_extraction_tweak < 0:
                 tweak_func = partial(sitk.BinaryErode, kernelRadius=(pre_extraction_tweak, pre_extraction_tweak))
-            else:
+        else:
                 tweak_func = partial(sitk.BinaryDilate, kernelRadius=(pre_extraction_tweak, pre_extraction_tweak))
             sitk_seg = slicewise_operation(sitk_seg, tweak_func)
         sitk_seg = slicewise_binary_opening(sitk_seg, kernelRadius=(3, 3))
@@ -173,7 +202,15 @@ def main(input_dir: Path,
             
             # * save features
             main_logger.info(f"Saving to: {out_name}")
-            df.to_hdf(out_name, key=f'{idx}')
+            with pd.HDFStore(out_name) as hdf_file:
+                if f'/{idx}' in hdf_file.keys():
+                    if not overwrite:
+                        main_logger.warning(f"Key {idx} already in output H5, this might lead to unecessary inflation"
+                                            f"of file size.")
+                    else:
+                        main_logger.info(f"Key {idx} already in output H5, overwriting it")
+                # TODO: Implement update function
+                df.to_hdf(hdf_file, key=f'{idx}')
         except Exception as e:
             main_logger.exception(e)
             main_logger.error(f"Failed to process pair {(im, seg)}")
@@ -181,6 +218,8 @@ def main(input_dir: Path,
         if debug:
             break
     pass
+
+
 
 if __name__ == '__main__':
     main()
