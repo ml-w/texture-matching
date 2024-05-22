@@ -4,3 +4,5 @@ __pycache__
 src/_temp
 NPC_Segmentation
 patch_texture
+*.log
+*.h5
