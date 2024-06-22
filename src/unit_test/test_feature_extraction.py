@@ -28,6 +28,10 @@ class TestPatchPreprocessing(unittest.TestCase):
         if not self.pyrad_setting_file.is_file():
             raise FileNotFoundError(f"Cannot local setting file: {self.pyrad_setting_file}")
         
+        # Load defualt test image
+        self.img = sitk.ReadImage("./test_data/images/MRI_01.nii.gz")
+        self.seg = sitk.ReadImage("./test_data/segment/MRI_01.nii.gz", outputPixelType=sitk.sitkUInt8)
+        
         # mute radiomics
         radiomics.logger.setLevel(logging.ERROR)
         MNTSLogger.set_global_log_level('debug')
@@ -68,8 +72,8 @@ class TestPatchPreprocessing(unittest.TestCase):
     def test_extract_features_from_slice(self):
         """Test extraction from slice"""
         # Load image
-        img = sitk.ReadImage("./test_data/images/MRI_01.nii.gz")
-        seg = sitk.ReadImage("./test_data/segment/MRI_01.nii.gz", outputPixelType=sitk.sitkUInt8)
+        img = self.img
+        seg = self.seg
         seg[:, :, :] = 0
         seg[100:120, 100:120, 100] = 1
         
@@ -79,8 +83,8 @@ class TestPatchPreprocessing(unittest.TestCase):
     
     def test_extract_features_from_image(self):
         # Load image
-        img = sitk.ReadImage("./test_data/images/MRI_01.nii.gz")
-        seg = sitk.ReadImage("./test_data/segment/MRI_01.nii.gz", outputPixelType=sitk.sitkUInt8)
+        img = self.img
+        seg = self.seg
         
         # Remake the segmentation 
         seg[:, :, :] = 0
@@ -92,8 +96,8 @@ class TestPatchPreprocessing(unittest.TestCase):
         
     def test_extract_features_from_image_mpi(self):
         # Load image
-        img = sitk.ReadImage("./test_data/images/MRI_01.nii.gz")
-        seg = sitk.ReadImage("./test_data/segment/MRI_01.nii.gz", outputPixelType=sitk.sitkUInt8)
+        img = self.img
+        seg = self.seg
         
         # Remake the segmentation 
         seg[:, :, :] = 0
@@ -106,8 +110,8 @@ class TestPatchPreprocessing(unittest.TestCase):
         
     def test_extract_features_from_image_exhaustive(self):
         # Load image
-        img = sitk.ReadImage("./test_data/images/MRI_01.nii.gz")
-        seg = sitk.ReadImage("./test_data/segment/MRI_01.nii.gz", outputPixelType=sitk.sitkUInt8)
+        img = self.img
+        seg = self.seg
 
         # Remake the segmentation
         seg[:, :, :] = 0
@@ -120,8 +124,8 @@ class TestPatchPreprocessing(unittest.TestCase):
 
     def test_extract_features_randomly(self):
         # Load image
-        img = sitk.ReadImage("./test_data/images/MRI_01.nii.gz")
-        seg = sitk.ReadImage("./test_data/segment/MRI_01.nii.gz", outputPixelType=sitk.sitkUInt8)
+        img = self.img
+        seg = self.seg
 
         # Remake the segmentation
         seg[:, :, :] = 0
