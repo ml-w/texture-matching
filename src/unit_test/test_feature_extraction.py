@@ -135,3 +135,32 @@ class TestPatchPreprocessing(unittest.TestCase):
                                      pyrad_setting=self.pyrad_setting_file, dilate=20, shrink=2,
                                      num_workers=8, random_sampling=8, grid_drop_last=False)
         self.assertEqual(df.shape[0], 25 * 5 + 5 * 8)  # There's 25 16x16 patches per slice and 5 slices to process
+        
+    def test_coords_correctness(self):
+        r"""This test if the coordinates matches correctly with the patch"""
+        img = self.img
+        seg = self.seg
+        
+        # Remake the segmentation
+        seg[:, :, :] = 0
+        seg[95,100:120, 100:120] = 1
+        
+        # random sampling
+        n = 50 
+        l = 16
+        stack, coords = sample_patches_random(img[95], seg[95], l, n, return_coords=True)
+        stack = sitk.GetArrayFromImage(stack)
+
+        # make it back into an image
+        npimg = sitk.GetArrayFromImage(img[95])
+        reconstruct = np.zeros_like(npimg)
+        counts = np.zeros_like(reconstruct)
+        
+        for patch, c in zip(stack,coords):
+            # note that convention of numpy is (y, x)
+            reconstruct[c[1]:c[1] + l, c[0]:c[0] + l] += patch
+            counts[c[1]:c[1] + l, c[0]:c[0] + l] += 1
+            
+        # Only deal with non-zero components
+        reconstruct[reconstruct != 0] = reconstruct[reconstruct != 0] / counts[reconstruct != 0]
+        self.assertTrue(all(np.isclose(reconstruct[reconstruct != 0], npimg[reconstruct != 0], atol=0.1)))
