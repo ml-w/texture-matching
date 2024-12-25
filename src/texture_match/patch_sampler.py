@@ -1,6 +1,4 @@
 import SimpleITK as sitk
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 import numpy as np
 from typing import Union, Optional, List, Tuple, Any
 
@@ -267,7 +265,10 @@ def sample_patches_random(sitkslice: sitk.Image,
             An image object containing the stacked extracted patches. The origin is set to (0, 0, 0) and
             the spacing is set to (1, 1, 1).
         List[(int, int)]:
-            A list of tuple of two coordinates
+            A list of tuple of two coordinates. Follows SITK LPS convention, i.e., the output are [(x, y)]
+    
+    .. note::
+        Note that the convention for numpy is (y, x) with a top left corner convention.
     """
     # * Get patches
     # numpy version
