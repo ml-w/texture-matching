@@ -98,7 +98,75 @@ def main(input_dir: Path,
          extract_class: Optional[int],
          log_dir: Optional[PathLike], 
          debug: Optional[bool]):
-    
+    """
+    Extracts texture features from medical imaging data.
+
+    This script processes a pair of input directories containing medical images and corresponding 
+    segmentations. It extracts texture features using pyradiomics and saves the results 
+    to an output file. The script supports various options for customization, including 
+    patch-based feature extraction, vicinity analysis, normalization, and parallel processing.
+
+    Args:
+        input_dir (Path):
+             Path to the input directory containing medical image files.
+        segment_dir (Path):
+             Path to the segmentation directory containing segmentation files.
+        output_file (Path):
+             Path to the output HDF5 file where features will be saved.
+        patch_size (int):
+             Size of the patch for patch-based feature extraction. Default is 16.
+        pyrad_setting_file (Optional[PathLike]):
+             Path to a Pyradiomics settings YAML file.
+        id_globber (Optional[str]):
+             Regular expression for matching IDs in filenames. Default is `r"^\w+\d+"`.
+        include_vicinity (Optional[bool]):
+             Whether to include vicinity features in the extraction. Default is False.
+        vic_dilate_px (Optional[int]):
+             Number of pixels to dilate the vicinity region. Calculated from `patch_size` if not specified.
+        vic_shrink_px (Optional[int]):
+             Number of pixels to shrink the vicinity region. Calculated from `patch_size` if not specified.
+        vic_random_sampling (Optional[int]):
+             Random sampling rate for vicinity segments. Default is 0 (exhaustive sampling).
+        with_normalization (Optional[bool]):
+             Whether to normalize the input data. Default is False.
+        norm_graph (Optional[PathLike]):
+             Path to the normalization graph YAML file. Required if `with_normalization` is True.
+        norm_states (Optional[PathLike]):
+             Path to the normalization state folder. Required if `with_normalization` is True.
+        num_workers (Optional[int]):
+             Number of workers for parallel processing. Default is 1.
+        idlist (Optional[Tuple[str]]):
+             List of IDs to process. If not specified, all IDs are processed.
+        overwrite (Optional[bool]):
+             Whether to overwrite existing keys in the output HDF5 file. Default is False.
+        grid_sampling (Optional[int]):
+             Patch grid overlap setting. If > 0, creates a uniformly overlapping grid instead of exhaustive sampling.
+        pre_extraction_tweak (Optional[int]):
+             Value to dilate (positive) or shrink (negative) the mask prior to feature extraction.
+        extract_class (Optional[int]):
+             Segmentation label to extract before calculating feature values. Default is None.
+        log_dir (Optional[PathLike]):
+             Directory for saving log files. If not specified, logs are printed to the console.
+        debug (Optional[bool]):
+             If True, processes only one case for debugging purposes. Default is False.
+
+    Raises:
+        ValueError: If required normalization settings are missing when `with_normalization` is True.
+        Exception: If an error occurs during feature extraction or file processing.
+
+    Example:
+        Run the script to extract features from a pair of directories and save the results to an HDF5 file:
+
+        ```bash
+        python main.py /path/to/input_dir /path/to/segment_dir /path/to/output_file.h5 \
+            --patch-size 16 --pyrad-setting-file settings.yaml --include-vicinity --with-normalization
+        ```
+
+    Notes:
+        - The IDs are matched between the input and segmentation directories using the `id_globber` regex.
+        - If `vic_dilate_px` or `vic_shrink_px` are not specified, their values are calculated based on the patch size.
+        - The script checks for discrepancies between image and segmentation metadata (size, spacing, origin) and resamples the segmentation if necessary.
+    """
     # * setup
     main_logger = MNTSLogger['texture-match'] if log_dir is None else MNTSLogger(str(log_dir), logger_name='texture-match', keep_file=True)
     output_file.parent.mkdir(exist_ok=True)
