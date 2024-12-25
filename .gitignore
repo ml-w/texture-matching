@@ -1,8 +1,11 @@
 __pycache__
 .pytest_cache
 .vscode
+*.neptune*
 src/_temp
 NPC_Segmentation
 patch_texture
 *.log
 *.h5
+*bak*
+.idea
